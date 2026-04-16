@@ -87,6 +87,8 @@ jobs:
         with:
           path: suricata
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - name: Install pinned cbindgen
+        run: cargo install --root /usr --force --debug --version 0.24.3 cbindgen
       - run: |
           ./autogen.sh
           ./configure
@@ -139,6 +141,8 @@ jobs:
         with:
           path: suricata
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - name: Install pinned cbindgen
+        run: cargo install --root /usr --force --debug --version 0.24.3 cbindgen
       - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
         working-directory: suricata
       - run: scripts/release/package-unix.sh
@@ -192,6 +196,8 @@ jobs:
         with:
           path: suricata
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - name: Install pinned cbindgen
+        run: cargo install --root /usr --force --debug --version 0.24.3 cbindgen
       - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
         working-directory: suricata
       - run: scripts/release/package-unix.sh
@@ -244,6 +250,8 @@ jobs:
         with:
           path: suricata
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - name: Install pinned cbindgen
+        run: cargo install --root /usr --force --debug --version 0.24.3 cbindgen
       - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
         working-directory: suricata
       - run: scripts/release/package-unix.sh
@@ -369,6 +377,7 @@ jobs:
             zstd
       - run: rustup toolchain install stable
       - run: rustup default stable
+      - run: cargo install --force --debug --version 0.24.3 cbindgen
       - run: chmod +x scripts/release/package-openwrt.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
         working-directory: suricata
       - run: scripts/release/package-openwrt.sh
@@ -409,6 +418,7 @@ jobs:
             zstd
       - run: rustup toolchain install stable
       - run: rustup default stable
+      - run: cargo install --force --debug --version 0.24.3 cbindgen
       - run: chmod +x scripts/release/package-openwrt.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
         working-directory: suricata
       - run: scripts/release/package-openwrt.sh
