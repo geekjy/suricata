@@ -1,0 +1,459 @@
+name: release-binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish artifacts to GitHub Release
+        required: true
+        type: boolean
+        default: true
+      tag_name:
+        description: Release tag for manual publishing
+        required: false
+        type: string
+      build_openwrt:
+        description: Build OpenWrt direct binaries
+        required: true
+        type: boolean
+        default: true
+      openwrt_version:
+        description: OpenWrt release used by toolchain jobs
+        required: false
+        type: string
+        default: 23.05.5
+
+permissions:
+  contents: write
+
+env:
+  DEFAULT_CONFIGURE_ARGS: --disable-gccmarch-native
+
+jobs:
+  installer-script:
+    name: Installer Script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: chmod +x scripts/install-release.sh
+        working-directory: suricata
+      - run: |
+          mkdir -p dist-release
+          cp scripts/install-release.sh dist-release/suricata-install-release.sh
+        working-directory: suricata
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-install-script
+          path: suricata/dist-release/suricata-install-release.sh
+          if-no-files-found: error
+
+  source-dist:
+    name: Source Dist
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - run: apt update
+      - run: |
+          DEBIAN_FRONTEND=noninteractive apt -y install \
+            autoconf \
+            automake \
+            build-essential \
+            cargo \
+            cmake \
+            curl \
+            cbindgen \
+            git \
+            hwloc \
+            libhwloc-dev \
+            jq \
+            libcap-ng-dev \
+            libjansson-dev \
+            liblz4-dev \
+            libmagic-dev \
+            libnet1-dev \
+            libpcap-dev \
+            libpcre2-dev \
+            libssl-dev \
+            libtool \
+            libyaml-dev \
+            pkg-config \
+            python3 \
+            python3-yaml \
+            rustc \
+            zlib1g-dev
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - run: |
+          ./autogen.sh
+          ./configure
+          make dist
+          mkdir -p dist-release
+          mv suricata-*.tar.gz dist-release/suricata-source.tar.gz
+        working-directory: suricata
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-source
+          path: suricata/dist-release/suricata-source.tar.gz
+          if-no-files-found: error
+
+  linux-ubuntu:
+    name: Ubuntu Binary
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - run: apt update
+      - run: |
+          DEBIAN_FRONTEND=noninteractive apt -y install \
+            autoconf \
+            automake \
+            build-essential \
+            cargo \
+            cmake \
+            curl \
+            cbindgen \
+            git \
+            hwloc \
+            libhwloc-dev \
+            libcap-ng-dev \
+            libevent-dev \
+            libjansson-dev \
+            liblz4-dev \
+            libmagic-dev \
+            libnet1-dev \
+            libpcap-dev \
+            libpcre2-dev \
+            libssl-dev \
+            libtool \
+            libyaml-dev \
+            pkg-config \
+            python3 \
+            python3-yaml \
+            rustc \
+            zip \
+            zlib1g-dev
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-unix.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-linux-ubuntu-x86_64
+          PLATFORM_FAMILY: linux
+          CONFIGURE_ARGS: ${{ env.DEFAULT_CONFIGURE_ARGS }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-linux-ubuntu-x86_64
+          path: suricata/dist-release/suricata-linux-ubuntu-x86_64.tar.gz
+          if-no-files-found: error
+
+  linux-almalinux:
+    name: AlmaLinux Binary
+    runs-on: ubuntu-latest
+    container: almalinux:9
+    steps:
+      - run: |
+          dnf -y install dnf-plugins-core epel-release
+          dnf config-manager --set-enabled crb
+          dnf -y install \
+            autoconf \
+            automake \
+            cbindgen \
+            gcc \
+            gcc-c++ \
+            git \
+            hwloc-devel \
+            jq \
+            libcap-ng-devel \
+            libevent-devel \
+            jansson-devel \
+            libmaxminddb-devel \
+            libnet-devel \
+            libpcap-devel \
+            libtool \
+            libyaml-devel \
+            lz4-devel \
+            make \
+            pcre2-devel \
+            pkgconfig \
+            python3 \
+            python3-devel \
+            python3-yaml \
+            rust-toolset \
+            which \
+            zlib-devel
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-unix.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-linux-almalinux-x86_64
+          PLATFORM_FAMILY: linux
+          CONFIGURE_ARGS: ${{ env.DEFAULT_CONFIGURE_ARGS }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-linux-almalinux-x86_64
+          path: suricata/dist-release/suricata-linux-almalinux-x86_64.tar.gz
+          if-no-files-found: error
+
+  linux-centos:
+    name: CentOS Stream Binary
+    runs-on: ubuntu-latest
+    container: quay.io/centos/centos:stream9
+    steps:
+      - run: |
+          dnf -y install dnf-plugins-core epel-release
+          dnf config-manager --set-enabled crb
+          dnf -y install \
+            autoconf \
+            automake \
+            cargo-vendor \
+            gcc \
+            gcc-c++ \
+            git \
+            hwloc-devel \
+            jq \
+            libcap-ng-devel \
+            libevent-devel \
+            jansson-devel \
+            libnet-devel \
+            libpcap-devel \
+            libtool \
+            libyaml-devel \
+            lz4-devel \
+            make \
+            pcre2-devel \
+            pkgconfig \
+            python3 \
+            python3-devel \
+            python3-yaml \
+            rust-toolset \
+            which \
+            zlib-devel
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE/suricata"
+      - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-unix.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-linux-centos-x86_64
+          PLATFORM_FAMILY: linux
+          CONFIGURE_ARGS: ${{ env.DEFAULT_CONFIGURE_ARGS }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-linux-centos-x86_64
+          path: suricata/dist-release/suricata-linux-centos-x86_64.tar.gz
+          if-no-files-found: error
+
+  macos:
+    name: macOS Binary
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: |
+          brew install \
+            autoconf \
+            automake \
+            cbindgen \
+            curl \
+            hiredis \
+            hwloc \
+            jansson \
+            jq \
+            libnet \
+            libtool \
+            libyaml \
+            pcre2 \
+            pkg-config \
+            python \
+            rust \
+            xz
+      - run: chmod +x scripts/release/package-unix.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-unix.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-macos-${{ runner.arch }}
+          PLATFORM_FAMILY: macos
+          ARCHIVE_FORMAT: zip
+          CONFIGURE_ARGS: ${{ env.DEFAULT_CONFIGURE_ARGS }}
+          CONFIGURE_ENV: CPATH="$HOMEBREW_PREFIX/include:$CPATH" LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH" PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
+          MAKE_ENV: CPATH="$HOMEBREW_PREFIX/include:$CPATH" LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH" PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
+          INSTALL_ENV: CPATH="$HOMEBREW_PREFIX/include:$CPATH" LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH" PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-macos
+          path: suricata/dist-release/suricata-macos-*.zip
+          if-no-files-found: error
+
+  windows:
+    name: Windows UCRT64 Binary
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ucrt64
+          update: true
+          install: |
+            autoconf
+            automake
+            git
+            make
+            mingw-w64-ucrt-x86_64-cbindgen
+            mingw-w64-ucrt-x86_64-jansson
+            mingw-w64-ucrt-x86_64-jq
+            mingw-w64-ucrt-x86_64-libpcap
+            mingw-w64-ucrt-x86_64-libtool
+            mingw-w64-ucrt-x86_64-libyaml
+            mingw-w64-ucrt-x86_64-pcre2
+            mingw-w64-ucrt-x86_64-python-yaml
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-toolchain
+            unzip
+            zip
+      - run: chmod +x scripts/release/package-windows.sh scripts/release/common.sh
+        working-directory: suricata
+      - run: scripts/release/package-windows.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-windows-x86_64
+          CONFIGURE_ARGS: --disable-gccmarch-native --disable-shared
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-windows-x86_64
+          path: suricata/dist-release/suricata-windows-x86_64.zip
+          if-no-files-found: error
+
+  openwrt-x86_64:
+    name: OpenWrt x86_64
+    if: ${{ inputs.build_openwrt }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: |
+          sudo apt update
+          sudo DEBIAN_FRONTEND=noninteractive apt -y install \
+            autoconf \
+            automake \
+            build-essential \
+            curl \
+            git \
+            libtool \
+            pkg-config \
+            python3 \
+            tar \
+            xz-utils \
+            zstd
+      - run: rustup toolchain install stable
+      - run: rustup default stable
+      - run: chmod +x scripts/release/package-openwrt.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-openwrt.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-openwrt-x86_64
+          RUST_TARGET: x86_64-unknown-linux-musl
+          OPENWRT_TARGET: x86
+          OPENWRT_SUBTARGET: generic
+          OPENWRT_VERSION: ${{ inputs.openwrt_version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-openwrt-x86_64
+          path: suricata/dist-release/suricata-openwrt-x86_64.tar.gz
+          if-no-files-found: error
+
+  openwrt-aarch64:
+    name: OpenWrt aarch64
+    if: ${{ inputs.build_openwrt }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: suricata
+      - run: |
+          sudo apt update
+          sudo DEBIAN_FRONTEND=noninteractive apt -y install \
+            autoconf \
+            automake \
+            build-essential \
+            curl \
+            git \
+            libtool \
+            pkg-config \
+            python3 \
+            tar \
+            xz-utils \
+            zstd
+      - run: rustup toolchain install stable
+      - run: rustup default stable
+      - run: chmod +x scripts/release/package-openwrt.sh scripts/release/common.sh scripts/release/templates/suricata-start.sh
+        working-directory: suricata
+      - run: scripts/release/package-openwrt.sh
+        working-directory: suricata
+        env:
+          RELEASE_NAME: suricata-openwrt-aarch64
+          RUST_TARGET: aarch64-unknown-linux-musl
+          OPENWRT_TARGET: armsr
+          OPENWRT_SUBTARGET: armv8
+          OPENWRT_BASE_URL: https://archive.openwrt.org/releases/${{ inputs.openwrt_version }}/targets/armsr/armv8
+          OPENWRT_VERSION: ${{ inputs.openwrt_version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suricata-openwrt-aarch64
+          path: suricata/dist-release/suricata-openwrt-aarch64.tar.gz
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - installer-script
+      - source-dist
+      - linux-ubuntu
+      - linux-almalinux
+      - linux-centos
+      - macos
+      - windows
+      - openwrt-x86_64
+      - openwrt-aarch64
+    if: ${{ always() && !cancelled() && inputs.publish_release }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide release tag
+        run: |
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="manual-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          fi
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          files: release-assets/**/*

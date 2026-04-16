@@ -17,6 +17,46 @@ developed by the [OISF](https://oisf.net) and the Suricata community.
 - [Installation Guide](https://docs.suricata.io/en/latest/install.html)
 - [User Support Forum](https://forum.suricata.io)
 
+## Binary Release Workflow
+
+This repository now includes a manual GitHub Actions workflow at
+`.github/workflows/release-binaries.yml` for building portable release
+artifacts and publishing them to GitHub Releases.
+
+Current stable release targets:
+
+- `suricata-openwrt-x86_64.tar.gz`
+- `suricata-openwrt-aarch64.tar.gz`
+- `suricata-linux-ubuntu-x86_64.tar.gz`
+- `suricata-linux-almalinux-x86_64.tar.gz`
+- `suricata-linux-centos-x86_64.tar.gz`
+- `suricata-macos-<arch>.zip`
+- `suricata-windows-x86_64.zip`
+- `suricata-source.tar.gz`
+- `suricata-install-release.sh`
+
+Linux hosts can install the latest matching release artifact with:
+
+```bash
+sudo bash scripts/install-release.sh
+```
+
+The installer will:
+
+- detect `ubuntu`, `openwrt`, `almalinux`, or `centos`
+- download the matching asset from the latest GitHub Release
+- install it under `/opt/suricata/releases`
+- update `/opt/suricata/current`
+- install the startup integration for the detected platform
+
+Installed services:
+
+- `systemd`: `suricata-release.service`
+- `OpenWrt`: `/etc/init.d/suricata-release`
+
+You can override the detected interface and runtime options in
+`/etc/default/suricata-release`.
+
 ## Contributing
 
 We're happily taking patches and other contributions. Please see our

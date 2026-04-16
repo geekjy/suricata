@@ -1,0 +1,16 @@
+[Unit]
+Description=Suricata IDS/IPS (GitHub Release)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/suricata-release
+ExecStart=/opt/suricata/current/bin/suricata-start
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
