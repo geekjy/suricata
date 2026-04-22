@@ -28,7 +28,7 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use suricata_sys::sys::{
     DetectEngineCtx, DetectEngineThreadCtx, Flow, SCDetectBufferSetActiveList,
-    SCDetectGetLastSMFromLists, SCDetectHelperBufferMpmRegister, SCDetectHelperBufferRegister,
+    SCDetectGetLastSMFromLists, SCDetectHelperBufferMpmRegister, SCDetectHelperBufferProgressRegister,
     SCDetectHelperKeywordAliasRegister, SCDetectHelperKeywordRegister,
     SCDetectSignatureSetAppProto, SCSigMatchAppendSMToList, SCSigTableAppLiteElmt, SigMatchCtx,
     Signature,
@@ -92,18 +92,31 @@ pub unsafe extern "C" fn SCSmbTxGetStubData(
     return 0;
 }
 
-#[no_mangle]
-pub extern "C" fn SCSmbTxMatchDceOpnum(tx: &SMBTransaction, dce_data: &mut DCEOpnumData) -> u8 {
-    SCLogDebug!("SCSmbTxMatchDceOpnum: start");
+pub(crate) unsafe extern "C" fn smb_tx_match_dce_opnum(
+    tx: *mut c_void, ctx: *const SigMatchCtx,
+) -> u8 {
+    let tx = cast_pointer!(tx, SMBTransaction);
+    let dce_data = cast_pointer!(ctx, DCEOpnumData);
+
+    SCLogDebug!("smb_tx_match_dce_opnum: start");
     if let Some(SMBTransactionTypeData::DCERPC(ref x)) = tx.type_data {
         if x.req_cmd == DCERPC_TYPE_REQUEST {
-            for range in dce_data.data.iter() {
-                if range.range2 == DETECT_DCE_OPNUM_RANGE_UNINITIALIZED {
-                    if range.range1 == x.opnum as u32 {
+            match dce_data {
+                DCEOpnumData::Num(ref num_data) => {
+                    if detect_match_uint(num_data, x.opnum) {
                         return 1;
                     }
-                } else if range.range1 <= x.opnum as u32 && range.range2 >= x.opnum as u32 {
-                    return 1;
+                }
+                DCEOpnumData::Ranges(ref ranges_data) => {
+                    for range in ranges_data.data.iter() {
+                        if range.range2 == DETECT_DCE_OPNUM_RANGE_UNINITIALIZED {
+                            if range.range1 == x.opnum as u32 {
+                                return 1;
+                            }
+                        } else if range.range1 <= x.opnum as u32 && range.range2 >= x.opnum as u32 {
+                            return 1;
+                        }
+                    }
                 }
             }
         }
@@ -412,10 +425,11 @@ pub unsafe extern "C" fn SCDetectSmbRegister() {
 
     G_SMB_VERSION_KW_ID = SCDetectHelperKeywordRegister(&version_kw);
 
-    G_SMB_VERSION_BUFFER_ID = SCDetectHelperBufferRegister(
+    G_SMB_VERSION_BUFFER_ID = SCDetectHelperBufferProgressRegister(
         b"smb_version\0".as_ptr() as *const libc::c_char,
         ALPROTO_SMB,
         STREAM_TOSERVER | STREAM_TOCLIENT,
+        0,
     );
 }
 

@@ -831,8 +831,9 @@ extern "C" {
     pub fn SCDetectHelperKeywordAliasRegister(kwid: u16, alias: *const ::std::os::raw::c_char);
 }
 extern "C" {
-    pub fn SCDetectHelperBufferRegister(
+    pub fn SCDetectHelperBufferProgressRegister(
         name: *const ::std::os::raw::c_char, alproto: AppProto, direction: u8,
+        progress: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -1753,6 +1754,9 @@ extern "C" {
 }
 extern "C" {
     pub fn SCFlowGetDestinationPort(flow: *const Flow) -> u16;
+}
+extern "C" {
+    pub fn SCFlowGetAppProtocol(f: *const Flow) -> AppProto;
 }
 extern "C" {
     pub fn SCSRepCatGetByShortname(shortname: *const ::std::os::raw::c_char) -> u8;
